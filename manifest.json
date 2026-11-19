@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "Stemfluisteraar",
+  "version": "1.0.0",
+  "description": "Transcribe Praat.ai audio with Azure OpenAI or Microsoft Foundry.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://*.openai.azure.com/*",
+    "https://*.services.ai.azure.com/*",
+    "https://*.cognitiveservices.azure.com/*",
+    "https://praat.ai/*",
+    "https://www.praat.ai/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Stemfluisteraar Settings",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://praat.ai/*",
+        "https://www.praat.ai/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

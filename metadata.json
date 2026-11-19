@@ -1,0 +1,6 @@
+{
+  "name": "Stemfluisteraar",
+  "description": "Stemfluisteraar (\"Voice Whisperer\") — a Manifest V3 Chrome extension and workbench for capturing Praat.ai audio and transcribing it via Azure OpenAI and Microsoft Foundry endpoints.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

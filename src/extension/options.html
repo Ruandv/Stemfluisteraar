@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Stemfluisteraar — Settings</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f8fafc;
+        --surface: #ffffff;
+        --border: #e2e8f0;
+        --border-strong: #cbd5e1;
+        --text: #0f172a;
+        --text-muted: #475569;
+        --accent: #0078d4;
+        --accent-hover: #006cbe;
+        --ok-bg: #f0fdf4;
+        --ok-border: #bbf7d0;
+        --ok-text: #166534;
+        --err-bg: #fef2f2;
+        --err-border: #fecaca;
+        --err-text: #991b1b;
+      }
+
+      *, *::before, *::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      .page {
+        max-width: 780px;
+        margin: 0 auto;
+        padding: 36px 20px 64px;
+      }
+
+      .header {
+        margin-bottom: 24px;
+      }
+
+      .header h1 {
+        margin: 0 0 6px;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+      }
+
+      .header p {
+        margin: 0;
+        color: var(--text-muted);
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 20px;
+      }
+
+      .section-title {
+        margin: 0 0 4px;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .section-desc {
+        margin: 0 0 18px;
+        font-size: 13px;
+        color: var(--text-muted);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      @media (max-width: 640px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .field.full {
+        grid-column: 1 / -1;
+      }
+
+      label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .hint {
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      input[type="text"],
+      input[type="url"],
+      input[type="password"],
+      input[type="number"],
+      select,
+      textarea {
+        width: 100%;
+        padding: 9px 12px;
+        font-size: 13.5px;
+        font-family: inherit;
+        color: var(--text);
+        background: #ffffff;
+        border: 1px solid var(--border-strong);
+        border-radius: 8px;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+        border-color: var(--accent);
+      }
+
+      .input-with-btn {
+        display: flex;
+        gap: 8px;
+      }
+
+      .input-with-btn input {
+        flex: 1;
+      }
+
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 12.5px;
+      }
+
+      .preview-box {
+        background: #f8fafc;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-top: 16px;
+      }
+
+      .preview-label {
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+      }
+
+      .preview-url {
+        word-break: break-all;
+        color: var(--text);
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .toggle-row input[type="checkbox"] {
+        width: 17px;
+        height: 17px;
+        accent-color: var(--accent);
+      }
+
+      .preset-bar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 6px;
+      }
+
+      .btn {
+        appearance: none;
+        border: 1px solid var(--border-strong);
+        background: #ffffff;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        padding: 9px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      .btn:hover:not(:disabled) {
+        background: #f1f5f9;
+      }
+
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn-sm {
+        padding: 6px 11px;
+        font-size: 12px;
+      }
+
+      .btn-primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #ffffff;
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+      }
+
+      .actions-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .actions-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .banner {
+        display: none;
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        font-size: 13px;
+      }
+
+      .banner.is-visible {
+        display: block;
+      }
+
+      .banner.is-success {
+        background: var(--ok-bg);
+        border-color: var(--ok-border);
+        color: var(--ok-text);
+      }
+
+      .banner.is-error {
+        background: var(--err-bg);
+        border-color: var(--err-border);
+        color: var(--err-text);
+      }
+
+      .banner pre {
+        margin: 8px 0 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 12px;
+      }
+
+      .footer-note {
+        font-size: 12.5px;
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header class="header">
+        <h1>Stemfluisteraar</h1>
+        <p>Configure your Azure OpenAI or Microsoft Foundry transcription and post-processing endpoints.</p>
+      </header>
+
+      <form id="settings-form" novalidate>
+        <section class="card">
+          <h2 class="section-title">Azure Transcription Endpoint</h2>
+          <p class="section-desc">
+            Requests run inside the Manifest V3 background service worker using extension host permissions.
+          </p>
+
+          <div class="grid">
+            <div class="field full">
+              <label for="endpoint">Azure Resource Endpoint URL</label>
+              <input
+                id="endpoint"
+                type="url"
+                placeholder="https://ruand-mllaybcr-swedencentral.openai.azure.com"
+                required
+              />
+              <span class="hint">Base resource URL without trailing path segments.</span>
+            </div>
+
+            <div class="field">
+              <label for="deployment">Transcription Deployment / Model</label>
+              <input
+                id="deployment"
+                type="text"
+                placeholder="gpt-4o-transcribe"
+                required
+              />
+              <span class="hint">e.g. gpt-4o-transcribe, gpt-4o-mini-transcribe, or whisper</span>
+            </div>
+
+            <div class="field">
+              <label for="endpointStyle">URL Pattern</label>
+              <select id="endpointStyle">
+                <option value="auto">Auto (Deployment if API version set, else /openai/v1)</option>
+                <option value="deployment">Deployment (/openai/deployments/{name}/audio/transcriptions)</option>
+                <option value="v1">OpenAI v1 (/openai/v1/audio/transcriptions)</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="apiVersion">API Version (Optional)</label>
+              <input
+                id="apiVersion"
+                type="text"
+                placeholder="2025-03-01-preview"
+              />
+              <span class="hint">Leave blank for /openai/v1, or enter e.g. 2024-06-01 / 2025-03-01-preview.</span>
+            </div>
+
+            <div class="field">
+              <label for="language">Language Hint (Optional)</label>
+              <input
+                id="language"
+                type="text"
+                placeholder="en (leave blank for auto-detect)"
+              />
+              <span class="hint">ISO-639-1 code such as en, es, de, or ja.</span>
+            </div>
+
+            <div class="field full">
+              <label for="apiKey">Azure API Key</label>
+              <div class="input-with-btn">
+                <input
+                  id="apiKey"
+                  type="password"
+                  placeholder="Enter your Azure OpenAI / Foundry API key"
+                  autocomplete="off"
+                  required
+                />
+                <button type="button" id="toggle-key-btn" class="btn">Show</button>
+              </div>
+              <span class="hint">Stored locally in chrome.storage.local on this device.</span>
+            </div>
+
+            <div class="field">
+              <label for="maxFileSizeMb">Max Audio Size (MB)</label>
+              <input id="maxFileSizeMb" type="number" min="1" max="200" step="1" />
+              <span class="hint">Azure transcription deployments typically allow up to 25 MB.</span>
+            </div>
+          </div>
+
+          <div class="preview-box">
+            <div class="preview-label">Resolved Transcription Request URL</div>
+            <div id="resolved-url-preview" class="preview-url mono"></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2 class="section-title">Optional Transcript Post-Processing (Azure LLM)</h2>
+          <p class="section-desc">
+            Automatically refine, punctuate, translate, or summarize the raw transcript with a second Azure chat deployment.
+          </p>
+
+          <div class="toggle-row">
+            <input id="enablePostProcessing" type="checkbox" />
+            <label for="enablePostProcessing">Enable Step 2 post-processing via Azure Chat Completions</label>
+          </div>
+
+          <div class="grid" id="post-process-fields">
+            <div class="field">
+              <label for="chatDeployment">Chat / LLM Deployment</label>
+              <input id="chatDeployment" type="text" placeholder="gpt-4o-mini" />
+            </div>
+
+            <div class="field">
+              <label for="chatApiVersion">Chat API Version (Optional)</label>
+              <input id="chatApiVersion" type="text" placeholder="2024-10-21" />
+            </div>
+
+            <div class="field full">
+              <label for="postProcessPrompt">Post-Processing System Prompt</label>
+              <textarea id="postProcessPrompt" rows="3"></textarea>
+              <div class="preset-bar">
+                <button type="button" class="btn btn-sm" data-preset="cleanup">Clean &amp; Punctuate</button>
+                <button type="button" class="btn btn-sm" data-preset="summary">Executive Summary</button>
+                <button type="button" class="btn btn-sm" data-preset="actions">Action Items</button>
+                <button type="button" class="btn btn-sm" data-preset="translate">Translate to English</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="actions-bar">
+          <div class="actions-left">
+            <button type="submit" id="save-btn" class="btn btn-primary">Save Settings</button>
+            <button type="button" id="test-btn" class="btn">Test Connection</button>
+          </div>
+          <button type="button" id="reset-btn" class="btn">Reset Defaults</button>
+        </div>
+
+        <div id="status-banner" class="banner" role="status" aria-live="polite"></div>
+      </form>
+
+      <p class="footer-note">
+        Target site matching is configured in <code>manifest.json</code> for
+        <code>https://praat.ai/*</code> and activates automatically on <code>/job/[GUID]</code> pages.
+      </p>
+    </main>
+
+    <script src="options.js"></script>
+  </body>
+</html>
