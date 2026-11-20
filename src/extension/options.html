@@ -410,6 +410,20 @@
           </div>
         </section>
 
+        <section class="card">
+          <h2 class="section-title">Automation</h2>
+          <p class="section-desc">
+            Run the whole job hands-free: when a Praat.ai job page loads, find the audio, transcribe it,
+            push the transcript into the editor and click <strong>Submit for Review</strong>.
+          </p>
+
+          <div class="toggle-row">
+            <input id="automateProcess" type="checkbox" />
+            <label for="automateProcess">Automating process (no user interaction)</label>
+          </div>
+          <span class="hint">Runs once per job page. If any step fails, it stops and shows the error in the panel without submitting.</span>
+        </section>
+
         <div class="actions-bar">
           <div class="actions-left">
             <button type="submit" id="save-btn" class="btn btn-primary">Save Settings</button>

@@ -44,6 +44,7 @@ function readFormValues(): ExtensionSettings {
   const chatDeployment = getElement<HTMLInputElement>('chatDeployment').value.trim();
   const chatApiVersion = getElement<HTMLInputElement>('chatApiVersion').value.trim();
   const postProcessPrompt = getElement<HTMLTextAreaElement>('postProcessPrompt').value.trim();
+  const automateProcess = getElement<HTMLInputElement>('automateProcess').checked;
 
   return {
     endpoint: normalizeEndpoint(endpointRaw),
@@ -58,6 +59,7 @@ function readFormValues(): ExtensionSettings {
     chatDeployment,
     chatApiVersion,
     postProcessPrompt: postProcessPrompt || DEFAULT_SETTINGS.postProcessPrompt,
+    automateProcess,
   };
 }
 
@@ -73,6 +75,7 @@ function writeFormValues(settings: ExtensionSettings): void {
   getElement<HTMLInputElement>('chatDeployment').value = settings.chatDeployment;
   getElement<HTMLInputElement>('chatApiVersion').value = settings.chatApiVersion;
   getElement<HTMLTextAreaElement>('postProcessPrompt').value = settings.postProcessPrompt;
+  getElement<HTMLInputElement>('automateProcess').checked = settings.automateProcess;
   updatePostProcessVisibility();
   updateResolvedUrlPreview();
 }

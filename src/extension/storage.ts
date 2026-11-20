@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   chatApiVersion: '2024-10-21',
   postProcessPrompt:
     'Clean up punctuation, fix obvious speech-to-text errors, and organize the transcript into readable paragraphs without changing the meaning.',
+  automateProcess: false,
 };
 
 export function normalizeEndpoint(raw: string): string {
@@ -67,6 +68,7 @@ export function sanitizeSettings(raw: Partial<ExtensionSettings> | undefined): E
       typeof raw?.postProcessPrompt === 'string' && raw.postProcessPrompt.trim().length > 0
         ? raw.postProcessPrompt.trim()
         : DEFAULT_SETTINGS.postProcessPrompt,
+    automateProcess: Boolean(raw?.automateProcess),
   };
 }
 

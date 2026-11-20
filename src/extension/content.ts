@@ -20,6 +20,97 @@ import {
 const HOST_ELEMENT_ID = 'azure-audio-transcriber-extension-host';
 const FAB_POSITION_STORAGE_KEY = 'azureAudioTranscriberFabPosition';
 
+function findPraatTranscriptionEditor(): HTMLTextAreaElement | null {
+  const editor = document.querySelector<HTMLTextAreaElement>(
+    'main textarea[data-slot="textarea"]'
+  );
+  return editor ?? document.querySelector<HTMLTextAreaElement>('main textarea');
+}
+
+function findPraatSubmitButton(): HTMLButtonElement | null {
+  const buttons = document.querySelectorAll<HTMLButtonElement>('button');
+  for (const button of buttons) {
+    if (button.textContent?.includes('Submit for Review')) {
+      return button;
+    }
+  }
+  return null;
+}
+
+function pushTranscriptToPraatEditor(text: string): boolean {
+  const editor = findPraatTranscriptionEditor();
+  if (!editor) {
+    return false;
+  }
+
+  const valueSetter = Object.getOwnPropertyDescriptor(
+    HTMLTextAreaElement.prototype,
+    'value'
+  )?.set;
+  if (!valueSetter) {
+    return false;
+  }
+
+  valueSetter.call(editor, text);
+  editor.dispatchEvent(new Event('input', { bubbles: true }));
+  editor.dispatchEvent(new Event('change', { bubbles: true }));
+  editor.focus();
+
+  return true;
+}
+
+/**
+ * Polls `check` until it returns a truthy value, the timeout elapses, or the
+ * signal aborts. Resolves with the value, or null on timeout/abort.
+ */
+function waitFor<T>(
+  check: () => T | null | undefined | false,
+  timeoutMs: number,
+  signal?: AbortSignal,
+  intervalMs = 250
+): Promise<T | null> {
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    const tick = (): void => {
+      if (signal?.aborted) {
+        resolve(null);
+        return;
+      }
+      const value = check();
+      if (value) {
+        resolve(value);
+        return;
+      }
+      if (Date.now() - startedAt >= timeoutMs) {
+        resolve(null);
+        return;
+      }
+      window.setTimeout(tick, intervalMs);
+    };
+    tick();
+  });
+}
+
+/**
+ * Clicks "Submit for Review" once the page has enabled it (React re-renders
+ * after the editor's input event, so the button may still be disabled briefly).
+ */
+async function submitPraatForReview(signal?: AbortSignal): Promise<boolean> {
+  const button = await waitFor(
+    () => {
+      const btn = findPraatSubmitButton();
+      return btn && !btn.disabled ? btn : null;
+    },
+    5000,
+    signal
+  );
+  if (!button || signal?.aborted) {
+    return false;
+  }
+  button.click();
+  return true;
+}
+
 interface FabPosition {
   left: number;
   top: number;
@@ -471,7 +562,11 @@ function createShadowStyles(): string {
 export interface MountedTranscriberController {
   unmount: () => void;
   refreshSources: () => void;
+  /** Hands-free run: wait for audio, transcribe, push to the editor and submit. */
+  runAutomation: () => Promise<void>;
 }
+
+const AUTOMATION_AUDIO_WAIT_MS = 30000;
 
 export function mountTranscriberOverlay(
   transport: ExtensionTransport = chromeRuntimeTransport,
@@ -603,13 +698,13 @@ export function mountTranscriberOverlay(
   copyBtn.textContent = 'Copy Transcript';
   copyBtn.disabled = true;
 
-  const downloadBtn = document.createElement('button');
-  downloadBtn.type = 'button';
-  downloadBtn.className = 'aat-btn';
-  downloadBtn.textContent = 'Download .txt';
-  downloadBtn.disabled = true;
+  const pushBtn = document.createElement('button');
+  pushBtn.type = 'button';
+  pushBtn.className = 'aat-btn';
+  pushBtn.textContent = 'Push';
+  pushBtn.disabled = true;
 
-  exportActions.append(copyBtn, downloadBtn);
+  exportActions.append(copyBtn, pushBtn);
   actionsRow.append(leftActions, exportActions);
 
   body.append(sourceRow, statusBox, viewTabs, transcriptArea, actionsRow);
@@ -634,6 +729,8 @@ export function mountTranscriberOverlay(
   let activeView: 'processed' | 'raw' = 'processed';
   let streamStopController: AbortController | null = null;
   let copyResetTimer: number | null = null;
+  let isAutomationRunning = false;
+  let automationAbort: AbortController | null = null;
 
   // Draggable floating button: the fab (and the panel docked to it) can be
   // repositioned anywhere on the page instead of being pinned to the
@@ -843,7 +940,7 @@ export function mountTranscriberOverlay(
       transcriptArea.style.display = 'none';
       viewTabs.style.display = 'none';
       copyBtn.disabled = true;
-      downloadBtn.disabled = true;
+      pushBtn.disabled = true;
       return;
     }
 
@@ -864,10 +961,10 @@ export function mountTranscriberOverlay(
 
     transcriptArea.value = text || '(Empty transcript returned)';
     copyBtn.disabled = text.length === 0;
-    downloadBtn.disabled = text.length === 0;
+    pushBtn.disabled = text.length === 0;
   }
 
-  async function runTranscriptionPipeline(): Promise<void> {
+  async function runTranscriptionPipeline(): Promise<TranscriptionSuccessData | null> {
     setPanelOpen(true);
     lastResult = null;
     activeView = 'processed';
@@ -888,7 +985,7 @@ export function mountTranscriberOverlay(
             'Looked for <audio> players and direct .mp3, .wav, .m4a, .ogg, .webm, or .flac links. Start playback if the player loads lazily, then click Rescan.',
         }
       );
-      return;
+      return null;
     }
 
     const selected =
@@ -935,7 +1032,7 @@ export function mountTranscriberOverlay(
           message: msg,
         });
       }
-      return;
+      return null;
     }
 
     streamStopController = null;
@@ -960,21 +1057,123 @@ export function mountTranscriberOverlay(
 
       if (!response.ok) {
         renderStatus('error', response.error.message, '', response.error);
-        return;
+        return null;
       }
 
       lastResult = response.data;
       updateTranscriptDisplay();
 
       const latencySec = (response.data.latencyMs / 1000).toFixed(1);
-      const summaryMeta = `${formatBytes(captured.byteLength)} · ${latencySec}s`;
+      const tokenInfo = response.data.estimatedTokens ? ` · ${response.data.estimatedTokens} tokens` : '';
+      const confidenceInfo = response.data.confidence !== undefined 
+        ? ` · ${(response.data.confidence * 100).toFixed(1)}% confidence`
+        : '';
+      const summaryMeta = `${formatBytes(captured.byteLength)} · ${latencySec}s${tokenInfo}${confidenceInfo}`;
+      
+      // Log response data for debugging
+      console.log('Transcription success response:', {
+        confidence: response.data.confidence,
+        transcript: response.data.transcript,
+        rawTranscript: response.data.rawTranscript,
+        postProcessed: response.data.postProcessed,
+        estimatedTokens: response.data.estimatedTokens,
+        latencyMs: response.data.latencyMs,
+      });
+      
       renderStatus('done', 'Done', summaryMeta);
+      return response.data;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       renderStatus('error', `Failed to send audio to background worker: ${msg}`, '', {
         code: 'UNKNOWN',
         message: msg,
       });
+      return null;
+    }
+  }
+
+  function isPipelineBusy(): boolean {
+    return (
+      stage === 'locating' ||
+      stage === 'reading' ||
+      stage === 'recording' ||
+      stage === 'transcribing' ||
+      stage === 'post-processing'
+    );
+  }
+
+  async function runAutomation(): Promise<void> {
+    if (isAutomationRunning || isPipelineBusy()) {
+      return;
+    }
+    isAutomationRunning = true;
+    automationAbort = new AbortController();
+    const signal = automationAbort.signal;
+
+    try {
+      setPanelOpen(true);
+      renderStatus('locating', 'Auto: waiting for page audio and editor...');
+
+      const ready = await waitFor(
+        () =>
+          discoverAudioSources(document).length > 0 && findPraatTranscriptionEditor() !== null,
+        AUTOMATION_AUDIO_WAIT_MS,
+        signal
+      );
+      if (signal.aborted) {
+        return;
+      }
+      if (!ready) {
+        const hasAudio = discoverAudioSources(document).length > 0;
+        const message = hasAudio
+          ? 'Auto: transcription editor not found on this page.'
+          : 'Auto: no audio appeared on this page.';
+        renderStatus('error', message, '', {
+          code: 'NO_AUDIO_FOUND',
+          message,
+          details: `Gave up after ${AUTOMATION_AUDIO_WAIT_MS / 1000}s. Nothing was submitted. Click Transcribe Selected to retry manually.`,
+        });
+        return;
+      }
+
+      const result = await runTranscriptionPipeline();
+      if (!result || signal.aborted) {
+        // Pipeline already rendered its own error state.
+        return;
+      }
+
+      const text = result.transcript.trim();
+      if (!text) {
+        renderStatus('error', 'Auto: transcript was empty, so nothing was submitted.');
+        return;
+      }
+
+      if (!pushTranscriptToPraatEditor(text)) {
+        renderStatus('error', 'Auto: could not find the Praat transcription editor.');
+        return;
+      }
+
+      const submitted = await submitPraatForReview(signal);
+      if (signal.aborted) {
+        return;
+      }
+      if (submitted) {
+        renderStatus('done', 'Auto: transcript pushed and submitted for review.');
+      } else {
+        renderStatus(
+          'error',
+          'Auto: transcript pushed, but "Submit for Review" was not available.',
+          '',
+          {
+            code: 'UNKNOWN',
+            message: 'Submit button missing or disabled.',
+            details: 'Check the transcript in the editor and submit it manually.',
+          }
+        );
+      }
+    } finally {
+      isAutomationRunning = false;
+      automationAbort = null;
     }
   }
 
@@ -1049,23 +1248,24 @@ export function mountTranscriberOverlay(
     });
   });
 
-  downloadBtn.addEventListener('click', () => {
+  pushBtn.addEventListener('click', () => {
     const text = transcriptArea.value;
     if (!text) {
       return;
     }
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const jobMatch = /^\/job\/([a-zA-Z0-9_-]+)/i.exec(window.location.pathname);
-    const safeJobId = jobMatch?.[1] ? `praat-job-${jobMatch[1]}` : 'transcript';
-    link.href = objectUrl;
-    link.download = `${safeJobId}-${stamp}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    if (pushTranscriptToPraatEditor(text)) {
+      pushBtn.textContent = 'Pushed';
+      void submitPraatForReview();
+    } else {
+      renderStatus(
+        'error',
+        'Could not find the Praat transcription editor.',
+        'Open a Praat job page and try again.'
+      );
+    }
+    window.setTimeout(() => {
+      pushBtn.textContent = 'Push';
+    }, 2000);
   });
 
   // Initial source scan
@@ -1074,6 +1274,7 @@ export function mountTranscriberOverlay(
 
   return {
     unmount: () => {
+      automationAbort?.abort();
       streamStopController?.abort();
       if (copyResetTimer !== null) {
         window.clearTimeout(copyResetTimer);
@@ -1083,6 +1284,7 @@ export function mountTranscriberOverlay(
     refreshSources: () => {
       populateSourceOptions();
     },
+    runAutomation,
   };
 }
 
@@ -1098,6 +1300,28 @@ function isTargetJobUrl(pathname: string): boolean {
 function initExtensionAutoMount(): void {
   let activeController: MountedTranscriberController | null = null;
   let lastPathname = '';
+  // Each job page is automated at most once, so a failed run never loops.
+  const automatedPaths = new Set<string>();
+
+  const maybeStartAutomation = (path: string): void => {
+    if (automatedPaths.has(path)) {
+      return;
+    }
+    automatedPaths.add(path);
+    void loadSettings()
+      .then((settings) => {
+        if (
+          settings.automateProcess &&
+          activeController &&
+          window.location.pathname === path
+        ) {
+          void activeController.runAutomation();
+        }
+      })
+      .catch(() => {
+        // Extension context invalidated (e.g. after an update); skip automation.
+      });
+  };
 
   const syncMountForCurrentRoute = (): void => {
     const currentPath = window.location.pathname;
@@ -1112,6 +1336,7 @@ function initExtensionAutoMount(): void {
       } else {
         activeController?.refreshSources();
       }
+      maybeStartAutomation(currentPath);
     } else if (activeController) {
       activeController.unmount();
       activeController = null;

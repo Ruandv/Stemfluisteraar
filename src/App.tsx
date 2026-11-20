@@ -64,7 +64,7 @@ const EXTENSION_FILES: ExtensionFileSpec[] = [
   {
     path: 'src/extension/content.ts',
     output: 'dist/content.js',
-    role: 'Shadow DOM floating button, collapsible panel, pipeline status, Copy & .txt export',
+    role: 'Shadow DOM floating button, collapsible panel, pipeline status, Copy & Push actions',
   },
   {
     path: 'src/extension/audio-extractor.ts',

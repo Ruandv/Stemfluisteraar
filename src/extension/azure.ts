@@ -201,6 +201,11 @@ async function fetchWithTimeout(
   }
 }
 
+function estimateTokens(text: string): number {
+  // Rough approximation: ~1 token per 4 characters for English/Afrikaans
+  return Math.ceil(text.length / 4);
+}
+
 function extractTranscriptText(rawBody: string): string {
   const trimmed = rawBody.trim();
   if (!trimmed) {
@@ -223,6 +228,47 @@ function extractTranscriptText(rawBody: string): string {
   }
 
   return trimmed;
+}
+
+function extractTranscriptMetadata(rawBody: string): { text: string; confidence?: number } {
+  const trimmed = rawBody.trim();
+  if (!trimmed) {
+    return { text: '' };
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (typeof parsed === 'object' && parsed !== null) {
+      const record = parsed as Record<string, unknown>;
+      const text = typeof record.text === 'string' 
+        ? record.text.trim()
+        : typeof record.transcript === 'string'
+        ? record.transcript.trim()
+        : '';
+      
+      // Log the parsed response to debug what fields are available
+      if (typeof window !== 'undefined') {
+        console.log('Azure response parsed:', record);
+      }
+      
+      // Check for confidence in various possible locations
+      let confidence: number | undefined;
+      if (typeof record.confidence === 'number') {
+        confidence = record.confidence;
+      } else if (typeof record.result === 'object' && record.result !== null) {
+        const result = record.result as Record<string, unknown>;
+        if (typeof result.confidence === 'number') {
+          confidence = result.confidence;
+        }
+      }
+      
+      return { text, confidence };
+    }
+  } catch {
+    // Some Azure configurations with response_format=text return plain text directly
+  }
+
+  return { text: trimmed };
 }
 
 function extractChatCompletionText(rawBody: string): string {
@@ -372,7 +418,7 @@ export async function transcribeWithAzure(
   }
 
   const bodyText = await response.text();
-  const rawTranscript = extractTranscriptText(bodyText);
+  const { text: rawTranscript, confidence } = extractTranscriptMetadata(bodyText);
 
   if (!rawTranscript && settings.enablePostProcessing) {
     return {
@@ -382,11 +428,14 @@ export async function transcribeWithAzure(
       transcriptionUrl,
       deployment: settings.deployment,
       latencyMs: Date.now() - startedAt,
+      estimatedTokens: 0,
+      confidence,
     };
   }
 
   if (settings.enablePostProcessing && settings.chatDeployment.trim().length > 0) {
     const postProcessed = await postProcessTranscript(rawTranscript, settings);
+    const tokenCount = estimateTokens(postProcessed.text) + estimateTokens(rawTranscript);
     return {
       transcript: postProcessed.text,
       rawTranscript,
@@ -396,6 +445,8 @@ export async function transcribeWithAzure(
       deployment: settings.deployment,
       chatDeployment: settings.chatDeployment,
       latencyMs: Date.now() - startedAt,
+      estimatedTokens: tokenCount,
+      confidence,
     };
   }
 
@@ -406,6 +457,8 @@ export async function transcribeWithAzure(
     transcriptionUrl,
     deployment: settings.deployment,
     latencyMs: Date.now() - startedAt,
+    estimatedTokens: estimateTokens(rawTranscript),
+    confidence,
   };
 }
 

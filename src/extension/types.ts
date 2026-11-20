@@ -12,6 +12,7 @@ export interface ExtensionSettings {
   chatDeployment: string;
   chatApiVersion: string;
   postProcessPrompt: string;
+  automateProcess: boolean;
 }
 
 export type PipelineStage =
@@ -63,6 +64,8 @@ export interface TranscriptionSuccessData {
   deployment: string;
   chatDeployment?: string;
   latencyMs: number;
+  estimatedTokens?: number;
+  confidence?: number;
 }
 
 export type ExtensionErrorCode =
